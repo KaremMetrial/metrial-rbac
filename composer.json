@@ -1,0 +1,55 @@
+{
+    "name": "metrial/laravel-rbac",
+    "description": "Enterprise-grade Role-Based Access Control for Laravel — roles, permissions, teams, hierarchy, time-bound assignments, and audit logging.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": ["laravel", "rbac", "permissions", "roles", "teams", "authorization", "audit"],
+    "homepage": "https://github.com/KaremMetrial/metrial-rbac",
+    "authors": [
+        {
+            "name": "Karem Metrial",
+            "email": "karim.metrial@gmail.com",
+            "homepage": "https://github.com/KaremMetrial",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/KaremMetrial/metrial-rbac/issues",
+        "source": "https://github.com/KaremMetrial/metrial-rbac"
+    },
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/database": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/auth": "^10.0|^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0|^12.0",
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Metrial\\RBAC\\": "src/",
+            "Metrial\\RBAC\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Metrial\\RBAC\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Metrial\\RBAC\\RbacServiceProvider"
+            ],
+            "aliases": {
+                "Rbac": "Metrial\\RBAC\\Facades\\Rbac"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
