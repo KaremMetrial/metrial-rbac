@@ -69,6 +69,16 @@ class RbacServiceProvider extends ServiceProvider
             __DIR__ . '/../database/seeders/' => database_path('seeders'),
         ], 'rbac-seeders');
 
+        // Publish API controllers (stubs for consumer to customize)
+        $this->publishes([
+            __DIR__ . '/../src/Controllers/Api/' => app_path('Http/Controllers/Api/Rbac'),
+        ], 'rbac-api');
+
+        // Register API routes (opt-in)
+        if (config('rbac.api.enabled', false)) {
+            $this->registerApiRoutes();
+        }
+
         // Register middleware
         $this->registerMiddleware();
 
@@ -100,8 +110,20 @@ class RbacServiceProvider extends ServiceProvider
                 Commands\PruneExpiredCommand::class,
                 Commands\AuditPruneCommand::class,
                 Commands\DoctorCommand::class,
+                Commands\IdeHelperCommand::class,
             ]);
         }
+    }
+
+    protected function registerApiRoutes(): void
+    {
+        $prefix = config('rbac.api.prefix', 'api/rbac');
+        $middleware = config('rbac.api.middleware', ['auth:sanctum']);
+
+        Route::prefix($prefix)
+            ->middleware($middleware)
+            ->name('api.rbac.')
+            ->group(__DIR__ . '/../routes/api.php');
     }
 
     protected function registerMiddleware(): void

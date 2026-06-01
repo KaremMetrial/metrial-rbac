@@ -110,6 +110,39 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | API
+    |--------------------------------------------------------------------------
+    | Enable built-in API routes for roles, permissions, teams, and audit logs.
+    | When enabled, routes are registered at the configured prefix.
+    | Controllers can be published and customized via --tag=rbac-api.
+    */
+    'api' => [
+        'enabled'    => false,
+        'prefix'     => 'api/rbac',
+        'middleware' => ['auth:sanctum'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Wildcard Permissions
+    |--------------------------------------------------------------------------
+    | Enable wildcard permissions like "posts.*" matching "posts.create", "posts.edit".
+    |
+    | Strategies:
+    | "group"   — A wildcard permission matches any permission in the same group.
+    |             e.g., a perm with name="posts.*" and group="posts" matches
+    |             all permissions where group="posts".
+    | "pattern" — A wildcard permission matches via SQL LIKE on the name column.
+    |             e.g., a perm with name="posts.*" matches any perm where
+    |             name LIKE "posts.%". Supports nested wildcards like "posts.comments.*".
+    */
+    'wildcards' => [
+        'enabled'  => true,
+        'strategy' => 'group', // "group" or "pattern"
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Gate Registration Mode
     |--------------------------------------------------------------------------
     | "auto"  — register every permission as a Gate ability at boot.

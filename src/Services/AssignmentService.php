@@ -348,12 +348,85 @@ class AssignmentService
         // 3. Merge all permission IDs
         $allPermissionIds = $directPermissions->merge($rolePermissions)->unique()->values();
 
+        // 4. Wildcard expansion
+        if (config('rbac.wildcards.enabled', true)) {
+            $wildcardIds = $this->resolveWildcardPermissionIds($morphType, $modelId, $teamId, $guard);
+            $allPermissionIds = $allPermissionIds->merge($wildcardIds)->unique()->values();
+        }
+
         if ($allPermissionIds->isEmpty()) {
             return collect();
         }
 
         return Permission::whereIn('id', $allPermissionIds)->pluck('name');
     }
+
+    /**
+     * Resolve permissions that are covered by wildcard permissions assigned to the user.
+     * Supports two strategies: "group" and "pattern".
+     */
+    protected function resolveWildcardPermissionIds(string $morphType, string $modelId, ?string $teamId, string $guard): Collection
+    {
+        $strategy = config('rbac.wildcards.strategy', 'group');
+
+        // Find wildcard permission IDs directly assigned to this user
+        $wildcardPermQuery = DB::table('model_permissions')
+            ->where('model_type', $morphType)
+            ->where('model_id', $modelId)
+            ->where('guard_name', $guard)
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+            });
+
+        if ($teamId) {
+            $wildcardPermQuery->where('team_id', $teamId);
+        }
+
+        $wildcardPermIds = $wildcardPermQuery->pluck('permission_id')->toArray();
+
+        if (empty($wildcardPermIds)) {
+            return collect();
+        }
+
+        // Load wildcard permission definitions
+        $wildcardPerms = DB::table('permissions')
+            ->whereIn('id', $wildcardPermIds)
+            ->where('name', 'LIKE', '%*%')
+            ->get();
+
+        if ($wildcardPerms->isEmpty()) {
+            return collect();
+        }
+
+        $matchedIds = collect();
+
+        foreach ($wildcardPerms as $wildcard) {
+            if (config('rbac.cache.enabled') && $strategy === 'group' && $wildcard->group) {
+                // Group strategy: match all permissions in the same group
+                $groupIds = DB::table('permissions')
+                    ->where('group', $wildcard->group)
+                    ->where('guard_name', $guard)
+                    ->pluck('id');
+                $matchedIds = $matchedIds->merge($groupIds);
+            } elseif ($strategy === 'pattern') {
+                // Pattern strategy: use LIKE matching on the name
+                $likePattern = str_replace('*', '%', $wildcard->name);
+                $patternIds = DB::table('permissions')
+                    ->where('guard_name', $guard)
+                    ->where('name', 'LIKE', $likePattern)
+                    ->pluck('id');
+                $matchedIds = $matchedIds->merge($patternIds);
+            }
+        }
+
+        return $matchedIds->unique()->values();
+    }
+
 
     protected function resolveRoles(Model $model, ?Team $team, string $guard): Collection
     {

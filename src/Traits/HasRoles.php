@@ -5,6 +5,7 @@ namespace Metrial\RBAC\Traits;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Metrial\RBAC\Models\Role;
 use Metrial\RBAC\Models\Team;
 use Metrial\RBAC\Services\AssignmentService;
@@ -141,7 +142,85 @@ trait HasRoles
 
         $permissions = $this->getPermissions($team);
 
-        return $permissions->contains($permName);
+        // Exact match
+        if ($permissions->contains($permName)) {
+            return true;
+        }
+
+        // Wildcard match (only when enabled and no exact match found)
+        if (config('rbac.wildcards.enabled', true)) {
+            return $this->hasWildcardPermission($permName, $team);
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a permission is covered by a wildcard permission (e.g., posts.*).
+     */
+    public function hasWildcardPermission(string $permissionName, ?Team $team = null): bool
+    {
+        $this->ensureRolesTraitInModel();
+
+        $strategy = config('rbac.wildcards.strategy', 'group');
+        $guard = 'web';
+        $teamId = $team?->id;
+
+        // Find wildcard permission IDs assigned to this user
+        $wildcardPermIds = DB::table('model_permissions')
+            ->where('model_type', $this->getMorphClass())
+            ->where('model_id', $this->getKey())
+            ->where('guard_name', $guard)
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($q) {
+                $now = now();
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+            })
+            ->when($teamId, fn ($q) => $q->where('team_id', $teamId))
+            ->pluck('permission_id')
+            ->toArray();
+
+        if (empty($wildcardPermIds)) {
+            return false;
+        }
+
+        // Load wildcard permission definitions (name contains *)
+        $wildcardPerms = \Illuminate\Support\Facades\DB::table('permissions')
+            ->whereIn('id', $wildcardPermIds)
+            ->where('name', 'LIKE', '%*%')
+            ->get();
+
+        if ($wildcardPerms->isEmpty()) {
+            return false;
+        }
+
+        foreach ($wildcardPerms as $wildcard) {
+            if ($strategy === 'group' && $wildcard->group) {
+                // Group strategy: check if the permission's group matches
+                $matchingPerm = \Illuminate\Support\Facades\DB::table('permissions')
+                    ->where('name', $permissionName)
+                    ->where('guard_name', $guard)
+                    ->first();
+
+                if ($matchingPerm && $matchingPerm->group === $wildcard->group) {
+                    return true;
+                }
+            } elseif ($strategy === 'pattern') {
+                // Pattern strategy: use LIKE matching
+                $likePattern = str_replace('*', '%', $wildcard->name);
+                $escaped = preg_quote($wildcard->name, '/');
+                $regex = '/^' . str_replace('\*', '.*', $escaped) . '$/';
+
+                if (preg_match($regex, $permissionName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function hasAnyPermission(array $permissions, ?Team $team = null): bool
