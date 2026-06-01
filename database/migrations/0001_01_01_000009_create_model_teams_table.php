@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreign('team_id')->references('id')->on('teams')->cascadeOnDelete();
 
             $table->index(['model_type', 'model_id']);
+            $table->unique(['team_id', 'model_type', 'model_id']);
         });
     }
 

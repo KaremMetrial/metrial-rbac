@@ -247,7 +247,7 @@ class AssignmentService
         $query = DB::table('model_permissions')
             ->where('model_type', $model->getMorphClass())
             ->where('model_id', $model->getKey())
-            ->where('guard_name', $guard)
+            ->where('model_permissions.guard_name', $guard)
             ->where(function ($q) {
                 $now = now();
                 $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
